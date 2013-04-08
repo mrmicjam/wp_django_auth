@@ -27,6 +27,7 @@ DOMAIN_NAME = "http://example.org"
 MYSQL_USER="mysql_user"
 MYSQL_PASSWD="password"
 MYSQL_DB="mysql_db"
+MYSQL_HOST="db"
 
 ##OPTIONAL OPTIMIZATION: GET THIS VALUE FROM wp-config.php so I don't have to call PHP on every auth to get it "define('LOGGED_IN_KEY', '**THIS VALUE**');"
 LOGGED_IN_KEY = ''
@@ -188,7 +189,7 @@ def generate_cookie(user_id, oPHP = None):
     if not user_id:
         return ["", ""]
     try:
-        db = MySQLdb.connect(user=MYSQL_USER, passwd=MYSQL_PASSWD, db=MYSQL_DB)
+        db = MySQLdb.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PASSWD, db=MYSQL_DB)
         cursor = db.cursor()   
         cursor.execute("select option_value from wp_options where option_name = 'logged_in_salt'")
         log_in_salt = cursor.fetchone()[0]
@@ -229,7 +230,7 @@ def auth_cookie(cookie, oPHP = None):
     cursor = None
     try:
         if cookie:
-            db = MySQLdb.connect(user=MYSQL_USER, passwd=MYSQL_PASSWD, db=MYSQL_DB)
+            db = MySQLdb.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PASSWD, db=MYSQL_DB)
             cursor = db.cursor()    
             username, expire, raw_hash = urllib.unquote(cookie).split("|")
             
