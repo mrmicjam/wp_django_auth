@@ -29,10 +29,9 @@ WP_MYSQL_PASSWD="password"
 WP_MYSQL_DB="mysql_db"
 WP_MYSQL_HOST="localhost"
 WP_TABLE_PREFIX='wp_'
-
-##OPTIONAL OPTIMIZATION: GET THIS VALUE FROM wp-config.php so I don't have to call PHP on every auth to get it "define('LOGGED_IN_KEY', '**THIS VALUE**');"
-LOGGED_IN_KEY = ''
-LOGGED_IN_SALT = ''
+##OPTIONAL: Fill in values below from wp-config.php to avoid PHP calls
+WP_LOGGED_IN_KEY = ''
+WP_LOGGED_IN_SALT = ''
 
 #---------------------------------------
 # A class for calling PHP from Python
@@ -79,15 +78,13 @@ class PHP:
 
     def get_wp_security_tokens(self):
         """ Returns the WordPress security tokens LOGGED_IN_KEY and LOGGED_IN_SALT """
-        if LOGGED_IN_KEY and LOGGED_IN_SALT:
-            logged_in_key = LOGGED_IN_KEY
-            logged_in_salt = LOGGED_IN_SALT
-        else:
+        global WP_LOGGED_IN_KEY, WP_LOGGED_IN_SALT
+        if not (WP_LOGGED_IN_KEY and WP_LOGGED_IN_SALT):
             code = "echo json_encode(array('LOGGED_IN_SALT' => LOGGED_IN_SALT, 'LOGGED_IN_KEY' => LOGGED_IN_KEY, 'wp_version' => $wp_version));"
             ret = self.get(code)
-            logged_in_key = ret['LOGGED_IN_KEY']
-            logged_in_salt = ret['LOGGED_IN_SALT']
-        return (logged_in_key, logged_in_salt)
+            WP_LOGGED_IN_KEY = ret['LOGGED_IN_KEY']
+            WP_LOGGED_IN_SALT = ret['LOGGED_IN_SALT']
+        return (WP_LOGGED_IN_KEY, WP_LOGGED_IN_SALT)
      
 #---------------------------------------
 # decorator that passes a PHP Bridge object
