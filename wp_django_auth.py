@@ -22,12 +22,12 @@ import md5 as hashlib
 
 
 ##REQUIRED PARAMETERS FOR THIS TO WORK
-WORDPRESS_DIR = '/var/www/html'
-DOMAIN_NAME = "http://example.org"
-MYSQL_USER="mysql_user"
-MYSQL_PASSWD="password"
-MYSQL_DB="mysql_db"
-MYSQL_HOST="db"
+WP_HOME_DIR = '/var/www/html'
+WP_URL = "http://www.example.org"
+WP_MYSQL_USER="mysql_user"
+WP_MYSQL_PASSWD="password"
+WP_MYSQL_DB="mysql_db"
+WP_MYSQL_HOST="localhost"
 
 ##OPTIONAL OPTIMIZATION: GET THIS VALUE FROM wp-config.php so I don't have to call PHP on every auth to get it "define('LOGGED_IN_KEY', '**THIS VALUE**');"
 LOGGED_IN_KEY = ''
@@ -100,7 +100,7 @@ def uses_php_bridge(func):
               require '%s/wp-load.php';
               require '%s/wp-includes/pluggable.php';
               require '%s/wp-includes/registration.php';
-              """ % (WORDPRESS_DIR, WORDPRESS_DIR, WORDPRESS_DIR))
+              """ % (WP_HOME_DIR, WP_HOME_DIR, WP_HOME_DIR))
         kwargs["oPHP"] = oPHP
         return func(*args, **kwargs)
     return wrap
@@ -202,7 +202,7 @@ def generate_cookie(user_id, oPHP = None):
     if not user_id:
         return ["", ""]
     try:
-        db = MySQLdb.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PASSWD, db=MYSQL_DB)
+        db = MySQLdb.connect(host=WP_MYSQL_HOST, user=WP_MYSQL_USER, passwd=WP_MYSQL_PASSWD, db=WP_MYSQL_DB)
         cursor = db.cursor()   
         
         #Get the password slice
@@ -221,7 +221,7 @@ def generate_cookie(user_id, oPHP = None):
         cookie = "%s|%s|%s" % (username.replace(" ", "+"), expire, to_match)
     finally:
         if cursor: cursor.close()
-    cookie_hash = hashlib.md5(DOMAIN_NAME)
+    cookie_hash = hashlib.md5(WP_URL)
     cookie_name = "wordpress_logged_in_" + cookie_hash.hexdigest()
     return [cookie_name, cookie]
 
@@ -234,7 +234,7 @@ def auth_cookie(cookie, oPHP = None):
     cursor = None
     try:
         if cookie:
-            db = MySQLdb.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PASSWD, db=MYSQL_DB)
+            db = MySQLdb.connect(host=WP_MYSQL_HOST, user=WP_MYSQL_USER, passwd=WP_MYSQL_PASSWD, db=WP_MYSQL_DB)
             cursor = db.cursor()    
             username, expire, raw_hash = urllib.unquote(cookie).split("|")
             
