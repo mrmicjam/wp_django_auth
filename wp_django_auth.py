@@ -20,18 +20,18 @@ import MySQLdb
 import urllib
 import hashlib
 
-
-##REQUIRED PARAMETERS FOR THIS TO WORK
-WP_HOME_DIR = '/var/www/html'
-WP_URL = "http://www.example.org"
-WP_MYSQL_USER="mysql_user"
-WP_MYSQL_PASSWD="password"
-WP_MYSQL_DB="mysql_db"
-WP_MYSQL_HOST="localhost"
-WP_TABLE_PREFIX='wp_'
-##OPTIONAL: Fill in values below from wp-config.php to avoid PHP calls
-WP_LOGGED_IN_KEY = ''
-WP_LOGGED_IN_SALT = ''
+WP_DJANGO_SETTINGS = {
+    'WP_HOME_DIR': '',
+    'WP_URL': '',
+    'WP_MYSQL_USER': '',
+    'WP_MYSQL_PASSWD': '',
+    'WP_MYSQL_DB': '',
+    'WP_MYSQL_HOST': 'localhost',
+    'WP_TABLE_PREFIX': 'wp_',
+    ##OPTIONAL: Fill in values below from wp-config.php to avoid PHP calls
+    'WP_LOGGED_IN_KEY': '',
+    'WP_LOGGED_IN_SALT': '',
+}
 
 
 class PHP:
@@ -97,14 +97,16 @@ class PHP:
         Returns the WordPress security tokens LOGGED_IN_KEY and LOGGED_IN_SALT
         :return: Tuple with WordPress configuration
         """
-        global WP_LOGGED_IN_KEY, WP_LOGGED_IN_SALT
-        if not (WP_LOGGED_IN_KEY and WP_LOGGED_IN_SALT):
+        global WP_DJANGO_SETTINGS
+        if not (len(WP_DJANGO_SETTINGS['WP_LOGGED_IN_KEY']) and
+                len(WP_DJANGO_SETTINGS['WP_LOGGED_IN_SALT'])):
             code = "echo json_encode(array('LOGGED_IN_SALT' => LOGGED_IN_SALT, \
             'LOGGED_IN_KEY' => LOGGED_IN_KEY, 'wp_version' => $wp_version));"
             ret = self.get(code)
-            WP_LOGGED_IN_KEY = ret['LOGGED_IN_KEY']
-            WP_LOGGED_IN_SALT = ret['LOGGED_IN_SALT']
-        return (WP_LOGGED_IN_KEY, WP_LOGGED_IN_SALT)
+            WP_DJANGO_SETTINGS['WP_LOGGED_IN_KEY'] = ret['LOGGED_IN_KEY']
+            WP_DJANGO_SETTINGS['WP_LOGGED_IN_SALT'] = ret['LOGGED_IN_SALT']
+        return (WP_DJANGO_SETTINGS['WP_LOGGED_IN_KEY'],
+                WP_DJANGO_SETTINGS['WP_LOGGED_IN_SALT'])
 
 
 def uses_php_bridge(func):
@@ -117,11 +119,14 @@ def uses_php_bridge(func):
     def wrap(*args, **kwargs):
         oPHP = kwargs.get("oPHP", None)
         if not oPHP:
+            global WP_DJANGO_SETTINGS
             oPHP = PHP("""
               require '%s/wp-load.php';
               require '%s/wp-includes/pluggable.php';
               require '%s/wp-includes/registration.php';
-              """ % (WP_HOME_DIR, WP_HOME_DIR, WP_HOME_DIR))
+              """ % (WP_DJANGO_SETTINGS['WP_HOME_DIR'],
+                     WP_DJANGO_SETTINGS['WP_HOME_DIR'],
+                     WP_DJANGO_SETTINGS['WP_HOME_DIR']))
         kwargs["oPHP"] = oPHP
         return func(*args, **kwargs)
 
@@ -224,14 +229,18 @@ def generate_cookie(user_id, oPHP=None):
         return ["", ""]
     cursor = None
     try:
-        db = MySQLdb.connect(host=WP_MYSQL_HOST, user=WP_MYSQL_USER,
-                             passwd=WP_MYSQL_PASSWD, db=WP_MYSQL_DB)
+        global WP_DJANGO_SETTINGS
+        db = MySQLdb.connect(
+            host=WP_DJANGO_SETTINGS['WP_MYSQL_HOST'],
+            user=WP_DJANGO_SETTINGS['WP_MYSQL_USER'],
+            passwd=WP_DJANGO_SETTINGS['WP_MYSQL_PASSWD'],
+            db=WP_DJANGO_SETTINGS['WP_MYSQL_DB'])
         cursor = db.cursor()
 
         #Get the password slice
         cursor.execute(
             "select user_login, user_pass from %susers where ID = %s" % (
-            WP_TABLE_PREFIX, '%s'), (user_id, ))
+                WP_DJANGO_SETTINGS['WP_TABLE_PREFIX'], '%s'), (user_id, ))
         username, user_pass = cursor.fetchone()
         username = username.replace("+", " ")
         user_pass_slice = user_pass[8:12]
@@ -248,7 +257,7 @@ def generate_cookie(user_id, oPHP=None):
     finally:
         if cursor:
             cursor.close()
-    cookie_hash = hashlib.md5(WP_URL)
+    cookie_hash = hashlib.md5(WP_DJANGO_SETTINGS['WP_URL'])
     cookie_name = "wordpress_logged_in_" + cookie_hash.hexdigest()
     return [cookie_name, cookie]
 
@@ -265,8 +274,12 @@ def auth_cookie(cookie, oPHP=None):
     cursor = None
     try:
         if cookie:
-            db = MySQLdb.connect(host=WP_MYSQL_HOST, user=WP_MYSQL_USER,
-                                 passwd=WP_MYSQL_PASSWD, db=WP_MYSQL_DB)
+            global WP_DJANGO_SETTINGS
+            db = MySQLdb.connect(
+                host=WP_DJANGO_SETTINGS['WP_MYSQL_HOST'],
+                user=WP_DJANGO_SETTINGS['WP_MYSQL_USER'],
+                passwd=WP_DJANGO_SETTINGS['WP_MYSQL_PASSWD'],
+                db=WP_DJANGO_SETTINGS['WP_MYSQL_DB'])
             cursor = db.cursor()
             username, expire, raw_hash = urllib.unquote(cookie).split("|")
 
@@ -275,7 +288,7 @@ def auth_cookie(cookie, oPHP=None):
                 username = username.replace("+", " ")
                 cursor.execute(
                     "select ID, user_pass from %susers where user_login = %s" %
-                    (WP_TABLE_PREFIX, '%s'), (username, ))
+                    (WP_DJANGO_SETTINGS['WP_TABLE_PREFIX'], '%s'), (username, ))
                 to_return_id, user_pass = cursor.fetchone()
                 user_pass_slice = user_pass[8:12]
                 logged_in_key, logged_in_salt = oPHP.get_wp_security_tokens()
