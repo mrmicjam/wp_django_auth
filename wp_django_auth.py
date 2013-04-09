@@ -18,7 +18,7 @@ from django.http import HttpResponseRedirect
 import hmac
 import MySQLdb
 import urllib
-import md5 as hashlib
+import hashlib
 
 
 ##REQUIRED PARAMETERS FOR THIS TO WORK
