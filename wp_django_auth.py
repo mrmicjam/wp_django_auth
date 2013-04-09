@@ -31,6 +31,7 @@ MYSQL_HOST="db"
 
 ##OPTIONAL OPTIMIZATION: GET THIS VALUE FROM wp-config.php so I don't have to call PHP on every auth to get it "define('LOGGED_IN_KEY', '**THIS VALUE**');"
 LOGGED_IN_KEY = ''
+LOGGED_IN_SALT = ''
 
 #---------------------------------------
 # A class for calling PHP from Python
@@ -74,6 +75,18 @@ class PHP:
             line = line.strip()
             if line:
                 yield json.loads(line)
+
+    def get_wp_security_tokens(self):
+        """ Returns the WordPress security tokens LOGGED_IN_KEY and LOGGED_IN_SALT """
+        if LOGGED_IN_KEY and LOGGED_IN_SALT:
+            logged_in_key = LOGGED_IN_KEY
+            logged_in_salt = LOGGED_IN_SALT
+        else:
+            code = "echo json_encode(array('LOGGED_IN_SALT' => LOGGED_IN_SALT, 'LOGGED_IN_KEY' => LOGGED_IN_KEY, 'wp_version' => $wp_version));"
+            ret = self.get(code)
+            logged_in_key = ret['LOGGED_IN_KEY']
+            logged_in_salt = ret['LOGGED_IN_SALT']
+        return (logged_in_key, logged_in_salt)
      
 #---------------------------------------
 # decorator that passes a PHP Bridge object
@@ -191,8 +204,6 @@ def generate_cookie(user_id, oPHP = None):
     try:
         db = MySQLdb.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PASSWD, db=MYSQL_DB)
         cursor = db.cursor()   
-        cursor.execute("select option_value from wp_options where option_name = 'logged_in_salt'")
-        log_in_salt = cursor.fetchone()[0]
         
         #Get the password slice
         cursor.execute("select user_login, user_pass from wp_users where ID = %s", (user_id, ))
@@ -201,18 +212,11 @@ def generate_cookie(user_id, oPHP = None):
         user_pass_slice = user_pass[8:12]
         
         expire = str(int(time.time() + 5000))
-        
-        if LOGGED_IN_KEY:
-            auth_key = LOGGED_IN_KEY
-        else:
-            #The the auth_code as defined in wordpress
-            code = "echo json_encode(LOGGED_IN_KEY);" #defaults to 'auth' scheme
-            auth_key = oPHP.get(code)
-        hmac_key = hmac.new(auth_key + log_in_salt, username + user_pass_slice + "|" + expire)
-        
+        logged_in_key, logged_in_salt = oPHP.get_wp_security_tokens()
+        hmac_key = hmac.new(logged_in_key + logged_in_salt, username + user_pass_slice + "|" + expire)
         hmac_to_match = hmac.new(hmac_key.hexdigest(), username + "|" + expire)
         to_match = hmac_to_match.hexdigest()
-        
+
         #username, expire, raw_hash = urllib.unquote(cookie).split("|")
         cookie = "%s|%s|%s" % (username.replace(" ", "+"), expire, to_match)
     finally:
@@ -235,24 +239,13 @@ def auth_cookie(cookie, oPHP = None):
             username, expire, raw_hash = urllib.unquote(cookie).split("|")
             
             if int(expire) >= time.time():
-                #Get the salt
-                cursor.execute("select option_value from wp_options where option_name = 'logged_in_salt'")
-                log_in_salt = cursor.fetchone()[0]
-                
                 #Get the password slice
                 username = username.replace("+", " ")
                 cursor.execute("select ID, user_pass from wp_users where user_login = %s", (username, ))
                 to_return_id, user_pass = cursor.fetchone()
                 user_pass_slice = user_pass[8:12]
-                
-                if LOGGED_IN_KEY:
-                    auth_key = LOGGED_IN_KEY
-                else:
-                    #The the auth_code as defined in wordpress
-                    code = "echo json_encode(LOGGED_IN_KEY);" #defaults to 'auth' scheme
-                    auth_key = oPHP.get(code)
-                hmac_key = hmac.new(auth_key + log_in_salt, username + user_pass_slice + "|" + expire)
-                
+                logged_in_key, logged_in_salt = oPHP.get_wp_security_tokens()
+                hmac_key = hmac.new(logged_in_key + logged_in_salt, username + user_pass_slice + "|" + expire)
                 hmac_to_match = hmac.new(hmac_key.hexdigest(), username + "|" + expire)
                 to_match = hmac_to_match.hexdigest() 
                 if to_match == raw_hash:
