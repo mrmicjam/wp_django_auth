@@ -28,6 +28,7 @@ WP_MYSQL_USER="mysql_user"
 WP_MYSQL_PASSWD="password"
 WP_MYSQL_DB="mysql_db"
 WP_MYSQL_HOST="localhost"
+WP_TABLE_PRFIX='wp_'
 
 ##OPTIONAL OPTIMIZATION: GET THIS VALUE FROM wp-config.php so I don't have to call PHP on every auth to get it "define('LOGGED_IN_KEY', '**THIS VALUE**');"
 LOGGED_IN_KEY = ''
@@ -206,7 +207,7 @@ def generate_cookie(user_id, oPHP = None):
         cursor = db.cursor()   
         
         #Get the password slice
-        cursor.execute("select user_login, user_pass from wp_users where ID = %s", (user_id, ))
+        cursor.execute("select user_login, user_pass from %susers where ID = %s", (WP_TABLE_PRFIX, user_id, ))
         username, user_pass = cursor.fetchone()
         username = username.replace("+", " ")
         user_pass_slice = user_pass[8:12]
@@ -241,7 +242,7 @@ def auth_cookie(cookie, oPHP = None):
             if int(expire) >= time.time():
                 #Get the password slice
                 username = username.replace("+", " ")
-                cursor.execute("select ID, user_pass from wp_users where user_login = %s", (username, ))
+                cursor.execute("select ID, user_pass from %susers where user_login = %s", (WP_TABLE_PRFIX, username, ))
                 to_return_id, user_pass = cursor.fetchone()
                 user_pass_slice = user_pass[8:12]
                 logged_in_key, logged_in_salt = oPHP.get_wp_security_tokens()
