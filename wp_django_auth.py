@@ -33,6 +33,14 @@ WP_DJANGO_SETTINGS = {
     'WP_LOGGED_IN_SALT': '',
 }
 
+try:
+    from django.conf import settings
+    if hasattr(settings, 'WP_DJANGO_SETTINGS'):
+        WP_DJANGO_SETTINGS = dict(WP_DJANGO_SETTINGS.items() +
+                                  settings.WP_DJANGO_SETTINGS.items())
+except ImportError:
+    pass
+
 
 class PHP:
     """ A class for calling PHP from Python """
