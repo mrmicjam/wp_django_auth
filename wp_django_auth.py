@@ -11,7 +11,7 @@
 #You should have received a copy of the GNU General Public License
 #along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import popen2
+from subprocess import Popen, PIPE
 import simplejson as json
 import time
 from django.http import HttpResponseRedirect
@@ -48,14 +48,14 @@ class PHP:
         self.postfix = postfix
 
     def __submit(self, code):
-        (out, inp) = popen2.popen2("php")
-        print >>inp, "<?php "
-        print >>inp, self.prefix
-        print >>inp, code
-        print >>inp, self.postfix
-        print >>inp, " ?>"
-        inp.close()
-        return out
+        p = Popen('php', shell=True, bufsize=4096, stdin=PIPE, stdout=PIPE, close_fds=True)
+        print >>p.stdin, "<?php "
+        print >>p.stdin, self.prefix
+        print >>p.stdin, code
+        print >>p.stdin, self.postfix
+        print >>p.stdin, " ?>"
+        p.stdin.close()
+        return p.stdout
 
     def get_raw(self, code):
         """Given a code block, invoke the code and return the raw result as a string."""
