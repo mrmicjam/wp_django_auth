@@ -4,6 +4,13 @@ from django.contrib.auth.models import User
 
 
 class WPAuthenticationBackend(object):
+    """
+    Custom authentication back-end supporting user authentication inside
+    WordPress database
+
+    For now, an local user must exist with same username as in WordPress. This
+    is required due to permissions model implemented by Django
+    """
 
     def authenticate(self, username=None, password=None):
         # http://stackoverflow.com/questions/13193278/understand-python-threading-bug
